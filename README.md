@@ -26,7 +26,7 @@ python main.py
 | `0` | Pattern 10 |
 | `[` | Pattern 11 (spiral) |
 | `]` | Pattern 12 (ellipse) |
-| `A` | Toggle auto-play (1 → 12, then loops) |
+| `A` | Toggle auto-play (1 → 12, then closes) |
 | `,` / `.` | Decrease / increase time per pattern (5s steps, default 30s) |
 | `B` / `S` | Bigger / smaller ball |
 | `C` | Cycle ball color (10 colors; blue and red first) |
@@ -35,7 +35,7 @@ python main.py
 | `G` | Toggle path guide line |
 | `Esc` | Quit |
 
-During auto-play, a **blink reminder** appears for 5 seconds between patterns, and an **eyes-closed rest** screen appears for 1 minute after pattern 12.
+During auto-play, a **blink reminder** appears for 5 seconds between patterns, and an **eyes-closed rest** screen appears for 1 minute after pattern 12 — then the app closes.
 
 ## Ball colors
 
@@ -59,8 +59,8 @@ During auto-play, a **blink reminder** appears for 5 seconds between patterns, a
 5. Bowtie
 6. Hourglass
 7. Circle (clockwise)
-8. Zigzag
-9. Horizontal spring loops
-10. Vertical spring loops
+8. Sawtooth (vertical up, diagonal down)
+9. Serpentine (horizontal rows)
+10. Star (pentagram)
 11. Outward spiral
 12. Horizontal ellipse

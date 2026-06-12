@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pygame
 
-from patterns import PATTERNS
+from patterns import PATTERNS, estimate_path_length
 
 # --- Display ---
 INITIAL_WIDTH, INITIAL_HEIGHT = 1024, 768
@@ -38,7 +38,7 @@ BLINK_MESSAGE = "Please blink actively"
 EYES_CLOSED_MESSAGE = "Please sit with your eyes closed for a minute."
 
 PATH_SAMPLES = 400
-DEFAULT_SPEED = 0.16  # fraction of path per second
+DEFAULT_SPEED = 0.32  # path-length multiplier (relative to pattern 1)
 MIN_SPEED = 0.02
 MAX_SPEED = 0.35
 
@@ -53,6 +53,9 @@ MAX_BALL_SCALE = 3.0
 BALL_SCALE_STEP = 0.15
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
+
+# Patterns 8, 9, 11 — ball reverses at each end instead of jumping to the start.
+PING_PONG_PATTERN_IDX = {7, 8, 10}
 
 
 def load_window_size() -> tuple[int, int]:
@@ -75,7 +78,8 @@ def save_window_size(width: int, height: int) -> None:
 
 
 def sample_path(fn, w: float, h: float, margin: float, n: int = PATH_SAMPLES) -> list[tuple[int, int]]:
-    return [tuple(map(int, fn(i / n, w, h, margin))) for i in range(n + 1)]
+    # Sample [0, 1) so open paths don't draw a closing line back to the start.
+    return [tuple(map(int, fn(i / n, w, h, margin))) for i in range(n)]
 
 
 def layout_metrics(w: int, h: int, ball_scale: float = 1.0) -> tuple[float, int, int]:
@@ -188,8 +192,10 @@ def main() -> None:
     font = pygame.font.SysFont(None, 24)
 
     pattern_idx = 0
-    phase = 0.0
+    path_distance = 0.0
+    path_direction = 1
     speed = DEFAULT_SPEED
+    path_cache: dict[str, float] = {}
     paused = False
     show_guide = True
     auto_play = True
@@ -200,13 +206,27 @@ def main() -> None:
     session_state = "playing"
     break_elapsed = 0.0
 
+    def get_path_lengths(width: int, height: int, margin: float) -> tuple[float, float]:
+        cache_key = f"{pattern_idx}:{width}:{height}:{margin:.1f}"
+        if cache_key not in path_cache:
+            _, _, fn = PATTERNS[pattern_idx]
+            _, _, ref_fn = PATTERNS[0]
+            path_cache[cache_key] = estimate_path_length(fn, width, height, margin)
+            path_cache[f"ref:{width}:{height}:{margin:.1f}"] = estimate_path_length(
+                ref_fn, width, height, margin
+            )
+        ref_key = f"ref:{width}:{height}:{margin:.1f}"
+        return path_cache[cache_key], path_cache[ref_key]
+
     def select_pattern(idx: int) -> None:
-        nonlocal pattern_idx, phase, pattern_elapsed, session_state, break_elapsed
+        nonlocal pattern_idx, path_distance, path_direction, pattern_elapsed, session_state, break_elapsed
         pattern_idx = idx % len(PATTERNS)
-        phase = 0.0
+        path_distance = 0.0
+        path_direction = 1
         pattern_elapsed = 0.0
         session_state = "playing"
         break_elapsed = 0.0
+        path_cache.clear()
 
     running = True
     try:
@@ -221,6 +241,7 @@ def main() -> None:
                     h = max(MIN_HEIGHT, event.h)
                     screen = pygame.display.set_mode((w, h), pygame.RESIZABLE)
                     save_window_size(w, h)
+                    path_cache.clear()
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
@@ -255,9 +276,27 @@ def main() -> None:
                         if idx is not None:
                             select_pattern(idx)
 
+            width, height = screen.get_size()
+            margin, ball_radius, line_width = layout_metrics(width, height, ball_scale)
+            phase = 0.0
+            if session_state == "playing":
+                path_length, ref_length = get_path_lengths(width, height, margin)
+                phase = path_distance / path_length if path_length > 0 else 0.0
+
             if not paused:
                 if session_state == "playing":
-                    phase = (phase + speed * dt) % 1.0
+                    pixels_per_second = speed * ref_length
+                    if path_length > 0:
+                        if pattern_idx in PING_PONG_PATTERN_IDX:
+                            path_distance += pixels_per_second * dt * path_direction
+                            if path_distance >= path_length:
+                                path_distance = path_length
+                                path_direction = -1
+                            elif path_distance <= 0:
+                                path_distance = 0.0
+                                path_direction = 1
+                        else:
+                            path_distance = (path_distance + pixels_per_second * dt) % path_length
                     if auto_play:
                         pattern_elapsed += dt
                         if pattern_elapsed >= pattern_duration:
@@ -273,10 +312,12 @@ def main() -> None:
                         break_elapsed += dt
                         if break_elapsed >= BLINK_BREAK_DURATION:
                             pattern_idx += 1
-                            phase = 0.0
+                            path_distance = 0.0
+                            path_direction = 1
                             pattern_elapsed = 0.0
                             session_state = "playing"
                             break_elapsed = 0.0
+                            path_cache.clear()
                     else:
                         session_state = "playing"
                         break_elapsed = 0.0
@@ -284,17 +325,11 @@ def main() -> None:
                     if auto_play:
                         break_elapsed += dt
                         if break_elapsed >= EYES_CLOSED_DURATION:
-                            pattern_idx = 0
-                            phase = 0.0
-                            pattern_elapsed = 0.0
-                            session_state = "playing"
-                            break_elapsed = 0.0
+                            running = False
                     else:
                         session_state = "playing"
                         break_elapsed = 0.0
 
-            width, height = screen.get_size()
-            margin, ball_radius, line_width = layout_metrics(width, height, ball_scale)
             color_name, ball_color = BALL_COLORS[color_idx]
 
             screen.fill(BG_COLOR)
