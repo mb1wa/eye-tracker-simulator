@@ -81,15 +81,26 @@ def save_window_size(width: int, height: int) -> None:
 
 
 def pick_random_ball_pos(
-    width: int, height: int, margin: float, ball_radius: int,
+    width: int,
+    height: int,
+    margin: float,
+    ball_radius: int,
+    side: int,
 ) -> tuple[float, float]:
-    left = margin + ball_radius
+    """Pick a random position on the left (0) or right (1) half of the screen."""
     top = margin + ball_radius
-    right = width - margin - ball_radius
     bottom = height - margin - ball_radius
-    if right <= left or bottom <= top:
+    mid = width / 2
+    if side == 0:
+        x_min = margin + ball_radius
+        x_max = mid - ball_radius
+    else:
+        x_min = mid + ball_radius
+        x_max = width - margin - ball_radius
+
+    if x_max <= x_min or bottom <= top:
         return width / 2, height / 2
-    return random.uniform(left, right), random.uniform(top, bottom)
+    return random.uniform(x_min, x_max), random.uniform(top, bottom)
 
 
 def sample_path(fn, w: float, h: float, margin: float, n: int = PATH_SAMPLES) -> list[tuple[int, int]]:
@@ -223,6 +234,7 @@ def main() -> None:
     break_elapsed = 0.0
     random_ball_pos: tuple[float, float] | None = None
     random_jump_timer = 0.0
+    random_side = 0
 
     def get_path_lengths(width: int, height: int, margin: float) -> tuple[float, float]:
         cache_key = f"{pattern_idx}:{width}:{height}:{margin:.1f}"
@@ -238,7 +250,7 @@ def main() -> None:
 
     def select_pattern(idx: int) -> None:
         nonlocal pattern_idx, path_distance, path_direction, pattern_elapsed
-        nonlocal session_state, break_elapsed, random_ball_pos, random_jump_timer
+        nonlocal session_state, break_elapsed, random_ball_pos, random_jump_timer, random_side
         pattern_idx = idx % len(PATTERNS)
         path_distance = 0.0
         path_direction = 1
@@ -247,6 +259,7 @@ def main() -> None:
         break_elapsed = 0.0
         random_ball_pos = None
         random_jump_timer = 0.0
+        random_side = random.randint(0, 1)
         path_cache.clear()
 
     running = True
@@ -312,8 +325,10 @@ def main() -> None:
                     if pattern_idx == RANDOM_PATTERN_IDX:
                         random_jump_timer += dt
                         if random_ball_pos is None or random_jump_timer >= RANDOM_JUMP_INTERVAL:
+                            if random_ball_pos is not None:
+                                random_side = 1 - random_side
                             random_ball_pos = pick_random_ball_pos(
-                                width, height, margin, ball_radius,
+                                width, height, margin, ball_radius, random_side,
                             )
                             random_jump_timer = 0.0
                     else:
@@ -370,7 +385,7 @@ def main() -> None:
                 if pattern_idx == RANDOM_PATTERN_IDX:
                     if random_ball_pos is None:
                         random_ball_pos = pick_random_ball_pos(
-                            width, height, margin, ball_radius,
+                            width, height, margin, ball_radius, random_side,
                         )
                     bx, by = random_ball_pos
                 else:

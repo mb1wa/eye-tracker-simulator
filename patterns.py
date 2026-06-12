@@ -59,6 +59,19 @@ def _bounds(w: float, h: float, margin: float) -> tuple[float, float, float, flo
     return margin, margin, w - margin, h - margin
 
 
+def _bounds_tight_vertical(w: float, h: float, margin: float) -> tuple[float, float, float, float]:
+    """Small equal top/bottom inset; horizontal margin unchanged."""
+    v_margin = max(24.0, h * 0.025)
+    return margin, v_margin, w - margin, h - v_margin
+
+
+def _bounds_below_hud(w: float, h: float, margin: float) -> tuple[float, float, float, float]:
+    """Small bottom inset; extra top inset to sit below the HUD text."""
+    v_margin = max(24.0, h * 0.025)
+    hud_clearance = max(80.0, h * 0.11)
+    return margin, v_margin + hud_clearance, w - margin, h - v_margin
+
+
 # --- Pattern 1: vertical line ---
 def pattern_01_vertical(t: float, w: float, h: float, margin: float) -> Point:
     left, top, right, bottom = _bounds(w, h, margin)
@@ -140,7 +153,7 @@ def pattern_08_sawtooth(t: float, w: float, h: float, margin: float) -> Point:
 
 # --- Pattern 9: horizontal serpentine (zigzag rows) ---
 def pattern_09_serpentine(t: float, w: float, h: float, margin: float) -> Point:
-    left, top, right, bottom = _bounds(w, h, margin)
+    left, top, right, bottom = _bounds_tight_vertical(w, h, margin)
     rows = 5
     y_levels = [top + i * (bottom - top) / (rows - 1) for i in range(rows)]
     points: list[Point] = [(left, y_levels[0]), (right, y_levels[0])]
@@ -152,7 +165,7 @@ def pattern_09_serpentine(t: float, w: float, h: float, margin: float) -> Point:
 
 # --- Pattern 10: five-pointed star (pentagram) ---
 def pattern_10_star(t: float, w: float, h: float, margin: float) -> Point:
-    left, top, right, bottom = _bounds(w, h, margin)
+    left, top, right, bottom = _bounds_below_hud(w, h, margin)
     cx = (left + right) / 2
     cy = (top + bottom) / 2
     r = min(right - left, bottom - top) / 2

@@ -64,4 +64,4 @@ During auto-play, a **blink reminder** appears for 5 seconds between patterns, a
 9. Star (pentagram)
 10. Spiral
 11. Horizontal ellipse
-12. Random jump (new position every second)
+12. Random jump (alternates left/right every second)
