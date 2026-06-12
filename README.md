@@ -23,9 +23,9 @@ python main.py
 |-----|--------|
 | `←` `→` | Previous / next pattern |
 | `1`–`9` | Jump to pattern 1–9 |
-| `0` | Pattern 10 |
-| `[` | Pattern 11 (spiral) |
-| `]` | Pattern 12 (ellipse) |
+| `0` | Pattern 10 (spiral) |
+| `[` | Pattern 11 (ellipse) |
+| `]` | Pattern 12 (random jump) |
 | `A` | Toggle auto-play (1 → 12, then closes) |
 | `,` / `.` | Decrease / increase time per pattern (5s steps, default 30s) |
 | `B` / `S` | Bigger / smaller ball |
@@ -33,6 +33,7 @@ python main.py
 | `+` / `-` | Increase / decrease speed |
 | `Space` | Pause / resume |
 | `G` | Toggle path guide line |
+| `H` | Hide / show on-screen text (HUD) |
 | `Esc` | Quit |
 
 During auto-play, a **blink reminder** appears for 5 seconds between patterns, and an **eyes-closed rest** screen appears for 1 minute after pattern 12 — then the app closes.
@@ -54,13 +55,13 @@ During auto-play, a **blink reminder** appears for 5 seconds between patterns, a
 
 1. Vertical line
 2. Horizontal line
-3. Diagonal line
-4. Square (clockwise)
-5. Bowtie
-6. Hourglass
-7. Circle (clockwise)
-8. Sawtooth (vertical up, diagonal down)
-9. Serpentine (horizontal rows)
-10. Star (pentagram)
-11. Outward spiral
-12. Horizontal ellipse
+3. Square (clockwise)
+4. Bowtie
+5. Hourglass
+6. Circle (clockwise)
+7. Sawtooth (vertical up, diagonal down)
+8. Serpentine (horizontal rows)
+9. Star (pentagram)
+10. Spiral
+11. Horizontal ellipse
+12. Random jump (new position every second)

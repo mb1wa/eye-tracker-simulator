@@ -75,13 +75,6 @@ def pattern_02_horizontal(t: float, w: float, h: float, margin: float) -> Point:
     return x, cy
 
 
-# --- Pattern 3: diagonal line ---
-def pattern_03_diagonal(t: float, w: float, h: float, margin: float) -> Point:
-    left, top, right, bottom = _bounds(w, h, margin)
-    s = _ping_pong(t)
-    return _lerp(left, right, s), _lerp(bottom, top, s)
-
-
 # --- Pattern 4: square (clockwise) ---
 def pattern_04_square(t: float, w: float, h: float, margin: float) -> Point:
     left, top, right, bottom = _bounds(w, h, margin)
@@ -148,7 +141,7 @@ def pattern_08_sawtooth(t: float, w: float, h: float, margin: float) -> Point:
 # --- Pattern 9: horizontal serpentine (zigzag rows) ---
 def pattern_09_serpentine(t: float, w: float, h: float, margin: float) -> Point:
     left, top, right, bottom = _bounds(w, h, margin)
-    rows = 8
+    rows = 5
     y_levels = [top + i * (bottom - top) / (rows - 1) for i in range(rows)]
     points: list[Point] = [(left, y_levels[0]), (right, y_levels[0])]
     for i in range(1, rows):
@@ -180,10 +173,14 @@ def pattern_11_spiral(t: float, w: float, h: float, margin: float) -> Point:
     cy = (top + bottom) / 2
     max_r = min(right - left, bottom - top) / 2
     turns = 3.5
-    phase = _path_phase(t)
-    theta = -2.0 * math.pi * turns * phase
-    r = max_r * phase
-    return cx + r * math.cos(theta), cy + r * math.sin(theta)
+    samples = 400
+    points: list[Point] = []
+    for i in range(samples + 1):
+        phase = i / samples
+        theta = -2.0 * math.pi * turns * phase
+        r = max_r * phase
+        points.append((cx + r * math.cos(theta), cy + r * math.sin(theta)))
+    return _follow_polyline(points, t)
 
 
 # --- Pattern 12: horizontal ellipse ---
@@ -214,17 +211,22 @@ def estimate_path_length(
     return total
 
 
+# Position is driven by the main loop; this is a list placeholder only.
+def pattern_13_random(_t: float, w: float, h: float, margin: float) -> Point:
+    return (w / 2, h / 2)
+
+
 PATTERNS: list[tuple[str, str, PatternFn]] = [
     ("1", "Vertical line", pattern_01_vertical),
     ("2", "Horizontal line", pattern_02_horizontal),
-    ("3", "Diagonal line", pattern_03_diagonal),
-    ("4", "Square", pattern_04_square),
-    ("5", "Bowtie", pattern_05_bowtie),
-    ("6", "Hourglass", pattern_06_hourglass),
-    ("7", "Circle", pattern_07_circle),
-    ("8", "Sawtooth", pattern_08_sawtooth),
-    ("9", "Serpentine", pattern_09_serpentine),
-    ("10", "Star", pattern_10_star),
-    ("11", "Spiral", pattern_11_spiral),
-    ("12", "Ellipse", pattern_12_ellipse),
+    ("3", "Square", pattern_04_square),
+    ("4", "Bowtie", pattern_05_bowtie),
+    ("5", "Hourglass", pattern_06_hourglass),
+    ("6", "Circle", pattern_07_circle),
+    ("7", "Sawtooth", pattern_08_sawtooth),
+    ("8", "Serpentine", pattern_09_serpentine),
+    ("9", "Star", pattern_10_star),
+    ("10", "Spiral", pattern_11_spiral),
+    ("11", "Ellipse", pattern_12_ellipse),
+    ("12", "Random jump", pattern_13_random),
 ]

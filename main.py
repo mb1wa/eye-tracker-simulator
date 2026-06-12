@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -54,8 +55,10 @@ BALL_SCALE_STEP = 0.15
 
 CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
 
-# Patterns 8, 9, 11 — ball reverses at each end instead of jumping to the start.
-PING_PONG_PATTERN_IDX = {7, 8, 10}
+# Patterns 7, 8, 10 — ball reverses at each end instead of jumping to the start.
+PING_PONG_PATTERN_IDX = {6, 7, 9}
+RANDOM_PATTERN_IDX = len(PATTERNS) - 1
+RANDOM_JUMP_INTERVAL = 1.0
 
 
 def load_window_size() -> tuple[int, int]:
@@ -75,6 +78,18 @@ def save_window_size(width: int, height: int) -> None:
         json.dumps({"width": width, "height": height}, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def pick_random_ball_pos(
+    width: int, height: int, margin: float, ball_radius: int,
+) -> tuple[float, float]:
+    left = margin + ball_radius
+    top = margin + ball_radius
+    right = width - margin - ball_radius
+    bottom = height - margin - ball_radius
+    if right <= left or bottom <= top:
+        return width / 2, height / 2
+    return random.uniform(left, right), random.uniform(top, bottom)
 
 
 def sample_path(fn, w: float, h: float, margin: float, n: int = PATH_SAMPLES) -> list[tuple[int, int]]:
@@ -161,9 +176,9 @@ def draw_hud(
         status = f"{remaining:.0f}s left ({pattern_duration:.0f}s each)"
 
     lines = [
-        f"Pattern {pattern_idx + 1}/12: {name}  |  Auto: {'ON' if auto_play else 'OFF'}  |  {status}",
+        f"Pattern {pattern_idx + 1}/{len(PATTERNS)}: {name}  |  Auto: {'ON' if auto_play else 'OFF'}  |  {status}",
         f"Speed: {speed:.2f}  Ball: {ball_scale:.1f}x  Color: {color_name}  {'[PAUSED]' if paused else ''}",
-        "←/→ pattern  A:auto  ,/. time  B/S ball  C color  +/- speed  Space pause  G guide  Esc quit",
+        "←/→ pattern  A:auto  ,/. time  B/S ball  C color  +/- speed  Space pause  G guide  H hide  Esc quit  (0 [ ] = 10-12)",
     ]
     pad = 10
     line_h = font.get_linesize()
@@ -198,6 +213,7 @@ def main() -> None:
     path_cache: dict[str, float] = {}
     paused = False
     show_guide = True
+    show_hud = True
     auto_play = True
     pattern_duration = DEFAULT_PATTERN_DURATION
     pattern_elapsed = 0.0
@@ -205,6 +221,8 @@ def main() -> None:
     color_idx = 0
     session_state = "playing"
     break_elapsed = 0.0
+    random_ball_pos: tuple[float, float] | None = None
+    random_jump_timer = 0.0
 
     def get_path_lengths(width: int, height: int, margin: float) -> tuple[float, float]:
         cache_key = f"{pattern_idx}:{width}:{height}:{margin:.1f}"
@@ -219,13 +237,16 @@ def main() -> None:
         return path_cache[cache_key], path_cache[ref_key]
 
     def select_pattern(idx: int) -> None:
-        nonlocal pattern_idx, path_distance, path_direction, pattern_elapsed, session_state, break_elapsed
+        nonlocal pattern_idx, path_distance, path_direction, pattern_elapsed
+        nonlocal session_state, break_elapsed, random_ball_pos, random_jump_timer
         pattern_idx = idx % len(PATTERNS)
         path_distance = 0.0
         path_direction = 1
         pattern_elapsed = 0.0
         session_state = "playing"
         break_elapsed = 0.0
+        random_ball_pos = None
+        random_jump_timer = 0.0
         path_cache.clear()
 
     running = True
@@ -249,6 +270,8 @@ def main() -> None:
                         paused = not paused
                     elif event.key == pygame.K_g:
                         show_guide = not show_guide
+                    elif event.key == pygame.K_h:
+                        show_hud = not show_hud
                     elif event.key == pygame.K_a:
                         auto_play = not auto_play
                         pattern_elapsed = 0.0
@@ -279,24 +302,33 @@ def main() -> None:
             width, height = screen.get_size()
             margin, ball_radius, line_width = layout_metrics(width, height, ball_scale)
             phase = 0.0
-            if session_state == "playing":
+            path_length = 0.0
+            if session_state == "playing" and pattern_idx != RANDOM_PATTERN_IDX:
                 path_length, ref_length = get_path_lengths(width, height, margin)
                 phase = path_distance / path_length if path_length > 0 else 0.0
 
             if not paused:
                 if session_state == "playing":
-                    pixels_per_second = speed * ref_length
-                    if path_length > 0:
-                        if pattern_idx in PING_PONG_PATTERN_IDX:
-                            path_distance += pixels_per_second * dt * path_direction
-                            if path_distance >= path_length:
-                                path_distance = path_length
-                                path_direction = -1
-                            elif path_distance <= 0:
-                                path_distance = 0.0
-                                path_direction = 1
-                        else:
-                            path_distance = (path_distance + pixels_per_second * dt) % path_length
+                    if pattern_idx == RANDOM_PATTERN_IDX:
+                        random_jump_timer += dt
+                        if random_ball_pos is None or random_jump_timer >= RANDOM_JUMP_INTERVAL:
+                            random_ball_pos = pick_random_ball_pos(
+                                width, height, margin, ball_radius,
+                            )
+                            random_jump_timer = 0.0
+                    else:
+                        pixels_per_second = speed * ref_length
+                        if path_length > 0:
+                            if pattern_idx in PING_PONG_PATTERN_IDX:
+                                path_distance += pixels_per_second * dt * path_direction
+                                if path_distance >= path_length:
+                                    path_distance = path_length
+                                    path_direction = -1
+                                elif path_distance <= 0:
+                                    path_distance = 0.0
+                                    path_direction = 1
+                            else:
+                                path_distance = (path_distance + pixels_per_second * dt) % path_length
                     if auto_play:
                         pattern_elapsed += dt
                         if pattern_elapsed >= pattern_duration:
@@ -335,14 +367,22 @@ def main() -> None:
             screen.fill(BG_COLOR)
 
             if session_state == "playing":
-                _, _, fn = PATTERNS[pattern_idx]
-                bx, by = fn(phase, width, height, margin)
-                bx, by = int(bx), int(by)
+                if pattern_idx == RANDOM_PATTERN_IDX:
+                    if random_ball_pos is None:
+                        random_ball_pos = pick_random_ball_pos(
+                            width, height, margin, ball_radius,
+                        )
+                    bx, by = random_ball_pos
+                else:
+                    _, _, fn = PATTERNS[pattern_idx]
+                    bx, by = fn(phase, width, height, margin)
 
-                if show_guide:
-                    path_points = sample_path(fn, width, height, margin)
-                    if len(path_points) > 1:
-                        pygame.draw.lines(screen, PATH_COLOR, False, path_points, line_width)
+                    if show_guide:
+                        path_points = sample_path(fn, width, height, margin)
+                        if len(path_points) > 1:
+                            pygame.draw.lines(screen, PATH_COLOR, False, path_points, line_width)
+
+                bx, by = int(bx), int(by)
 
                 pygame.draw.circle(screen, ball_color, (bx, by), ball_radius)
                 pygame.draw.circle(screen, (0, 0, 0), (bx, by), ball_radius, max(1, line_width))
@@ -353,11 +393,12 @@ def main() -> None:
                 remaining = EYES_CLOSED_DURATION - break_elapsed
                 draw_notification(screen, width, height, EYES_CLOSED_MESSAGE, remaining)
 
-            draw_hud(
-                screen, font, pattern_idx, speed, paused, width,
-                auto_play, pattern_duration, pattern_elapsed, ball_scale,
-                color_name, session_state,
-            )
+            if show_hud:
+                draw_hud(
+                    screen, font, pattern_idx, speed, paused, width,
+                    auto_play, pattern_duration, pattern_elapsed, ball_scale,
+                    color_name, session_state,
+                )
             pygame.display.flip()
     finally:
         width, height = screen.get_size()
